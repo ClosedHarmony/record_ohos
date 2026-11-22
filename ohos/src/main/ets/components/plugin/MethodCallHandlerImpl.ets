@@ -16,14 +16,26 @@ import { MethodCall, MethodResult, BinaryMessenger, MethodCallHandler } from '@o
 import { RecorderWrapper } from './RecorderWrapper';
 import { RecordConfig } from './RecordConfig';
 import { Utils } from './Utils';
+import { common } from '@kit.AbilityKit';
+import abilityAccessCtrl, { Permissions } from '@ohos.abilityAccessCtrl';
+import { BusinessError } from '@kit.BasicServicesKit';
+
+const MICROPHONE_PERMISSION: Permissions = 'ohos.permission.MICROPHONE';
 
 export class MethodCallHandlerImpl implements MethodCallHandler {
   private readonly TAG = 'MethodCallHandlerImpl';
   private messenger: BinaryMessenger;
   private recorders: Map<string, RecorderWrapper> = new Map<string, RecorderWrapper>();
+  private context: common.Context;
+  private abilityContext: common.UIAbilityContext | null = null;
 
-  constructor(messenger: BinaryMessenger) {
+  constructor(messenger: BinaryMessenger, context: common.Context) {
     this.messenger = messenger;
+    this.context = context;
+  }
+
+  setAbilityContext(context: common.UIAbilityContext | null): void {
+    this.abilityContext = context;
   }
 
   onMethodCall(call: MethodCall, result: MethodResult): void {
@@ -81,7 +93,7 @@ export class MethodCallHandlerImpl implements MethodCallHandler {
         recorder.cancel(result);
         break;
       case "hasPermission":
-        result.success(true);
+        this.hasPermission(call, result);
         break;
       case "getAmplitude":
         recorder.getAmplitude(result);
@@ -101,6 +113,31 @@ export class MethodCallHandlerImpl implements MethodCallHandler {
         break;
     }
   };
+
+  private async hasPermission(call: MethodCall, result: MethodResult): Promise<void> {
+    try {
+      const manager = abilityAccessCtrl.createAtManager();
+      const status = await manager.checkAccessToken(this.context.applicationInfo.accessTokenId, MICROPHONE_PERMISSION);
+      if (status === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
+        result.success(true);
+        return;
+      }
+      if (call.argument('request') === false) {
+        result.success(false);
+        return;
+      }
+      const context = this.abilityContext;
+      if (context == null) {
+        result.error('no_activity', 'Request microphone access from a foreground UIAbility.', null);
+        return;
+      }
+      const response = await manager.requestPermissionsFromUser(context, [MICROPHONE_PERMISSION]);
+      result.success(response.authResults[0] === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED);
+    } catch (error) {
+      const failure = error as BusinessError;
+      result.error(String(failure.code), failure.message, null);
+    }
+  }
 
   getRecordConfig(call: MethodCall): RecordConfig {
     let config = call.argument("androidConfig") as Map<string, Object>;

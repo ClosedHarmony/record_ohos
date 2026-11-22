@@ -132,10 +132,10 @@ class AudioRecorder {
     return RecordPlatform.instance.isPaused(_recorderId);
   }
 
-  /// Checks and requests for audio record permission.
-  Future<bool> hasPermission() async {
+  /// Checks recording permission, requesting it only when [request] is true.
+  Future<bool> hasPermission({bool request = true}) async {
     await _createCompleter.future;
-    return RecordPlatform.instance.hasPermission(_recorderId);
+    return RecordPlatform.instance.hasPermission(_recorderId, request: request);
   }
 
   /// Lists capture/input devices available on the platform.

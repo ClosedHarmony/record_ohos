@@ -2,6 +2,11 @@
 
 Ohos specific implementation for record package called by record_platform_interface.
 
+Plugin registration and recorder creation do not request microphone access.
+Call `hasPermission(request: false)` to inspect the current grant without a
+dialog. `hasPermission()` requests access if needed and returns the user's
+actual decision. Host apps must declare `ohos.permission.MICROPHONE`.
+
 ## Usage
 
 ```yaml
